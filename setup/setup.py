@@ -337,18 +337,10 @@ def s9_openbox():
     )
     ok("Created ~/.config/openbox/rc.xml")
 
-    conf = Path('/etc/lightdm/lightdm.conf')
-    if conf.exists():
-        text = sudo(f"cat {conf}", capture=True).stdout
-        if 'autologin-session' in text:
-            text = re.sub(r'autologin-session=.*', 'autologin-session=openbox', text)
-        else:
-            text = re.sub(r'(\[SeatDefaults\][^\[]*)',
-                          r'\1autologin-session=openbox\n', text, count=1)
-        sudo_write(str(conf), text)
-        ok("LightDM autologin session set to openbox")
-    else:
-        warn("LightDM config not found — set autologin-session=openbox manually")
+    sudo("mkdir -p /etc/lightdm/lightdm.conf.d")
+    sudo_write("/etc/lightdm/lightdm.conf.d/50-cablebox.conf",
+               "[SeatDefaults]\nautologin-session=openbox\n")
+    ok("LightDM autologin session set to openbox")
 
 
 def s10_optimise():
