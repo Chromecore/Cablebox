@@ -127,7 +127,7 @@ Use antimicrox to map controller buttons to keyboard keys.
 | Esc | Close overlay / go back |
 | * | Open admin PIN entry |
 | Alt+F4 | Exit kiosk |
-| Ctrl+Alt+D | Switch to full desktop |
+| Ctrl+Alt+D | Show login screen (select Cinnamon to get to desktop) |
 | Ctrl+Alt+T | Open terminal |
 | Ctrl+Alt+F2 | Text console fallback |
 

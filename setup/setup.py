@@ -118,7 +118,7 @@ def s1_packages():
     info("Updating and upgrading packages...")
     sudo("apt-get update -qq")
     sudo("DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq")
-    sudo("DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git firefox")
+    sudo("DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git firefox xterm")
     ok("curl, git, firefox installed")
 
 
@@ -307,8 +307,7 @@ def s9_openbox():
     (ob / 'autostart').chmod(0o755)
     ok("Created ~/.config/openbox/autostart")
 
-    de = get_de()
-    switch_cmd = f"pkill -f firefox; {de}-session" if de in ('cinnamon', 'gnome') else "pkill -f firefox"
+    switch_cmd = "pkill -f firefox; cinnamon --replace &"
 
     (ob / 'rc.xml').write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
