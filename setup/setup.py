@@ -186,28 +186,40 @@ def s5_media():
     info("Current block devices:")
     run("lsblk")
     if not ask("Set up media drive auto-mount now?"):
-        warn("Skipping — edit standalone-compose.yml later if your media isn't at /media"); return
-
-    device = prompt("Device path (e.g. /dev/sdb1)")
-    if not device: warn("Skipping"); return
-    mount = prompt("Mount point", default="/media")
-
-    sudo(f"mkdir -p {mount}")
-    r = sudo(f"mount {device} {mount}", check=False)
-    if r.returncode != 0:
-        warn("Mount failed — check the device name and retry manually"); return
-
-    r = run(f"sudo blkid -s UUID -o value {device}", capture=True, check=False)
-    uuid = r.stdout.strip()
-    if uuid:
-        fstab = Path('/etc/fstab').read_text()
-        if uuid not in fstab:
-            sudo(f"bash -c \"echo 'UUID={uuid} {mount} auto defaults,nofail 0 2' >> /etc/fstab\"")
-            ok(f"Added UUID={uuid} to /etc/fstab")
-        else:
-            ok("Drive already in /etc/fstab")
+        warn("Skipping — edit standalone-compose.yml later if your media isn't at /media")
+        mount = "/media"
     else:
-        warn("Could not get UUID — add the mount to /etc/fstab manually")
+        device = prompt("Device path (e.g. /dev/sdb1)")
+        if not device:
+            warn("Skipping mount")
+            mount = "/media"
+        else:
+            mount = prompt("Mount point", default="/media")
+            sudo(f"mkdir -p {mount}")
+            r = sudo(f"mount {device} {mount}", check=False)
+            if r.returncode != 0:
+                warn("Mount failed — check the device name and retry manually")
+                mount = "/media"
+            else:
+                r = run(f"sudo blkid -s UUID -o value {device}", capture=True, check=False)
+                uuid = r.stdout.strip()
+                if uuid:
+                    fstab = Path('/etc/fstab').read_text()
+                    if uuid not in fstab:
+                        sudo(f"bash -c \"echo 'UUID={uuid} {mount} auto defaults,nofail 0 2' >> /etc/fstab\"")
+                        ok(f"Added UUID={uuid} to /etc/fstab")
+                    else:
+                        ok("Drive already in /etc/fstab")
+                else:
+                    warn("Could not get UUID — add the mount to /etc/fstab manually")
+
+    for folder in ['Movies', 'Shows', 'Videos']:
+        path = Path(mount) / folder
+        if not path.exists():
+            sudo(f"mkdir -p {path}")
+            ok(f"Created {path}")
+        else:
+            ok(f"{path} already exists")
 
 
 def _wait_for(url, label, timeout=60):
@@ -249,13 +261,16 @@ def s7_cablebox():
     (CBOX / 'data').mkdir(parents=True, exist_ok=True)
     sudo(f"docker compose -f {COMP} up -d cablebox")
 
-    if _wait_for("http://localhost:8080/api/health", "CableBox", timeout=30):
+    ready = _wait_for("http://localhost:8080/api/health", "CableBox", timeout=60)
+    if ready:
         ok("CableBox is up at http://localhost:8080")
     else:
-        warn("CableBox hasn't responded — check 'sudo docker ps'")
+        warn("CableBox hasn't responded yet — it may still be starting")
+        warn("Check container logs with: sudo docker logs cablebox")
 
     pause(
-        "Open http://localhost:8080 in your browser:\n\n"
+        "Open http://localhost:8080 in your browser.\n"
+        "If you see a blank page, wait 10 seconds and refresh.\n\n"
         "1. Server URL:  http://localhost:8096\n"
         "2. Public URL:  (leave blank)\n"
         "3. API Key:     paste the key you copied from Jellyfin\n"
