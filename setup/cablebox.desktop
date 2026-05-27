@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=CableBox
+Comment=Start CableBox TV in kiosk mode
+Exec=bash -c 'xset s off && xset -dpms && until curl -sf http://localhost:8080/api/health > /dev/null 2>&1; do sleep 1; done && firefox --kiosk http://localhost:8080'
+X-GNOME-Autostart-enabled=true

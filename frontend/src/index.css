@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --accent: #7a00ff;
+  --accent-rgb: 122, 0, 255;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: 'Outfit', sans-serif;
+  color: white;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Safe area helpers — used by top navs on devices with notches/status bars */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.dot-grid {
+  background-image: radial-gradient(rgba(255,255,255,0.05) 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+/* Scrollbar styling for admin panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
+
+/* TV Guide grid — no scrollbars */
+.tvguide-grid::-webkit-scrollbar { display: none; }
+
+/* Focus ring for keyboard navigation */
+.kbd-focus:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+.animate-fade-in { animation: fade-in 0.2s ease-out; }
+.animate-shake   { animation: shake 0.5s ease-in-out; }

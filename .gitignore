@@ -1,0 +1,6 @@
+data/
+frontend/dist/
+frontend/node_modules/
+__pycache__/
+*.env
+docker-compose.yml

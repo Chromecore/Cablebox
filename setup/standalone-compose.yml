@@ -1,0 +1,27 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: always
+    network_mode: host
+    volumes:
+      - ${HOME}/jellyfin/config:/config
+      - ${HOME}/jellyfin/cache:/cache
+      - /media:/media:ro        # Edit this line: change /media to your media drive path
+    environment:
+      - JELLYFIN_PublishedServerUrl=http://localhost:8096
+
+  cablebox:
+    image: cablebox:latest
+    container_name: cablebox
+    restart: always
+    network_mode: host
+    volumes:
+      - ${HOME}/cablebox/data:/app/data
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+      - DATA_DIR=/app/data
+      - FRONTEND_DIR=/app/frontend/dist
+      - JELLYFIN_URL=http://localhost:8096
+      - JELLYFIN_PUBLIC_URL=http://localhost:8096
