@@ -331,6 +331,11 @@ def s9_openbox():
         f"        <command>bash -c '{switch_cmd}'</command>\n"
         '      </action>\n'
         '    </keybind>\n'
+        '    <keybind key="C-A-s">\n'
+        '      <action name="Execute">\n'
+        '        <command>systemctl poweroff</command>\n'
+        '      </action>\n'
+        '    </keybind>\n'
         '  </keyboard>\n'
         '</openbox_config>\n'
     )
@@ -350,21 +355,24 @@ def s9_openbox():
     sudo("chmod +x /usr/local/bin/cablebox-desktop")
     ok("Created /usr/local/bin/cablebox-desktop")
 
-    # Script to switch back to kiosk from desktop
-    sudo_write("/usr/local/bin/cablebox-kiosk",
+    # Cleanup script — LightDM runs this after every session ends, restoring openbox
+    sudo_write("/usr/local/bin/cablebox-session-cleanup",
                "#!/bin/bash\n"
                "sed -i 's/autologin-session=cinnamon/autologin-session=openbox/' "
-               "/etc/lightdm/lightdm.conf.d/50-cablebox.conf\n"
-               "reboot\n")
-    sudo("chmod +x /usr/local/bin/cablebox-kiosk")
-    ok("Created /usr/local/bin/cablebox-kiosk")
+               "/etc/lightdm/lightdm.conf.d/50-cablebox.conf\n")
+    sudo("chmod +x /usr/local/bin/cablebox-session-cleanup")
+    ok("Created /usr/local/bin/cablebox-session-cleanup")
 
-    # Allow running both scripts without a password prompt
-    sudoers = (f"{USER} ALL=(ALL) NOPASSWD: /usr/local/bin/cablebox-desktop\n"
-               f"{USER} ALL=(ALL) NOPASSWD: /usr/local/bin/cablebox-kiosk\n")
+    # Register the cleanup script with LightDM
+    sudo_write("/etc/lightdm/lightdm.conf.d/51-cablebox-cleanup.conf",
+               "[SeatDefaults]\nsession-cleanup-script=/usr/local/bin/cablebox-session-cleanup\n")
+    ok("LightDM session cleanup registered")
+
+    # Allow running the desktop switch script without a password prompt
+    sudoers = f"{USER} ALL=(ALL) NOPASSWD: /usr/local/bin/cablebox-desktop\n"
     sudo_write("/etc/sudoers.d/cablebox", sudoers)
     sudo("chmod 440 /etc/sudoers.d/cablebox")
-    ok("Sudoers configured (no password needed for switch scripts)")
+    ok("Sudoers configured (no password needed for desktop switch)")
 
 
 def s10_optimise():
