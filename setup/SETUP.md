@@ -1,6 +1,6 @@
-# CableBox — Standalone PC Setup Guide
+# Cablebox — Standalone PC Setup Guide
 
-A dedicated TV computer running CableBox + Jellyfin. When the PC turns on it boots straight into the cable box app — no login screen, no desktop.
+A dedicated TV computer running Cablebox + Jellyfin. When the PC turns on it boots straight into the cable box app — no login screen, no desktop.
 
 ---
 
@@ -32,14 +32,14 @@ sudo apt install -y curl git
 
 ## 2. Run the Setup Script
 
-Download and run the setup script — it will clone CableBox and walk through the full setup:
+Clone the repo then run the setup script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Chromecore/CableBox/main/setup/setup.py -o ~/cablebox_setup.py
-python3 ~/cablebox_setup.py
+git clone https://github.com/Chromecore/Cablebox.git ~/cablebox
+python3 ~/cablebox/setup/setup.py
 ```
 
-The script handles everything — packages, Docker, auto-login, Jellyfin, CableBox, kiosk, and optional Openbox fast-boot. It pauses twice for browser steps detailed below.
+The script handles everything — packages, Docker, auto-login, Jellyfin, Cablebox, kiosk, and optional Openbox fast-boot. It pauses twice for browser steps detailed below.
 
 ---
 
@@ -55,7 +55,7 @@ When the script pauses, open **http://localhost:8096** in a browser.
    - Click the green checkmark, then **OK**
 4. Click through the remaining wizard steps and **Finish**
 5. Log in with the account you just created
-6. Go to **Dashboard → API Keys → +**, name it `CableBox`, click **OK**, and **copy the key**
+6. Go to **Dashboard → API Keys → +**, name it `Cablebox`, click **OK**, and **copy the key**
 
 > **Media file naming:** Jellyfin expects standard naming:
 > ```
@@ -67,7 +67,7 @@ When the script pauses, open **http://localhost:8096** in a browser.
 
 ---
 
-## 4. CableBox First-Run Config
+## 4. Cablebox First-Run Config
 
 When the script pauses, open **http://localhost:8080** in a browser.
 
@@ -75,7 +75,7 @@ When the script pauses, open **http://localhost:8080** in a browser.
 2. **Public URL**: leave blank
 3. **API Key**: paste the key from Jellyfin
 4. Click **Test Connection** — should say "Connected!"
-5. Click **Save & Launch CableBox**
+5. Click **Save & Launch Cablebox**
 
 ---
 
@@ -144,7 +144,7 @@ Use antimicrox to map controller buttons to keyboard keys.
 
 ---
 
-## Updating CableBox
+## Updating Cablebox
 
 ```bash
 cd ~/cablebox && git pull
@@ -164,7 +164,7 @@ The image hasn't been built yet. Run `docker build -t cablebox:latest ~/cablebox
 **Blank screen or "connection refused" after kiosk launches**
 The containers may still be starting. Wait 15 seconds and refresh. Check with `docker ps`.
 
-**"Connection refused" on the CableBox first-run page**
+**"Connection refused" on the Cablebox first-run page**
 Jellyfin takes 15–30 seconds to fully start. Wait and try again.
 
 **Screen goes black after a while**

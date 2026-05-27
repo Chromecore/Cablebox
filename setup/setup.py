@@ -74,7 +74,7 @@ def sudo_write(path, content):
     Path(tmp).unlink(missing_ok=True)
 
 # ── environment ───────────────────────────────────────────────────────
-REPO_URL = 'https://github.com/Chromecore/CableBox.git'
+REPO_URL = 'https://github.com/Chromecore/Cablebox.git'
 
 USER = os.environ.get('USER') or run('whoami', capture=True).stdout.strip()
 HOME = Path.home()
