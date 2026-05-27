@@ -236,7 +236,7 @@ def s6_jellyfin():
     header(6, "Start Jellyfin")
     (HOME / 'jellyfin/config').mkdir(parents=True, exist_ok=True)
     (HOME / 'jellyfin/cache').mkdir(parents=True, exist_ok=True)
-    sudo(f"docker compose -f {COMP} up -d jellyfin")
+    sudo(f"env HOME={HOME} docker compose -f {COMP} up -d jellyfin")
 
     if _wait_for("http://localhost:8096/health", "Jellyfin", timeout=60):
         ok("Jellyfin is up at http://localhost:8096")
@@ -259,7 +259,7 @@ def s6_jellyfin():
 def s7_cablebox():
     header(7, "Start and configure CableBox")
     (CBOX / 'data').mkdir(parents=True, exist_ok=True)
-    sudo(f"docker compose -f {COMP} up -d cablebox")
+    sudo(f"env HOME={HOME} docker compose -f {COMP} up -d cablebox")
 
     ready = _wait_for("http://localhost:8080/api/health", "CableBox", timeout=60)
     if ready:
