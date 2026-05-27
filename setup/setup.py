@@ -307,7 +307,7 @@ def s9_openbox():
     (ob / 'autostart').chmod(0o755)
     ok("Created ~/.config/openbox/autostart")
 
-    switch_cmd = "pkill -f firefox; cinnamon --replace &"
+    switch_cmd = "pkill -f firefox; cinnamon --replace &amp;"
 
     (ob / 'rc.xml').write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
