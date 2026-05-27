@@ -366,7 +366,7 @@ def s10_optimise():
     ok("Desktop background set to black")
 
     sudo("sed -i 's/GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/' /etc/default/grub")
-    sudo("update-grub -q")
+    sudo("update-grub")
     ok("GRUB timeout → 1 second")
 
     sudo("mkdir -p /etc/systemd/journald.conf.d")
