@@ -307,7 +307,7 @@ def s9_openbox():
     (ob / 'autostart').chmod(0o755)
     ok("Created ~/.config/openbox/autostart")
 
-    switch_cmd = "pkill -f firefox; cinnamon --replace &amp;"
+    switch_cmd = "sudo /usr/local/bin/cablebox-desktop"
 
     (ob / 'rc.xml').write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -340,6 +340,31 @@ def s9_openbox():
     sudo_write("/etc/lightdm/lightdm.conf.d/50-cablebox.conf",
                "[SeatDefaults]\nautologin-session=openbox\n")
     ok("LightDM autologin session set to openbox")
+
+    # Script to switch to Cinnamon desktop from kiosk
+    sudo_write("/usr/local/bin/cablebox-desktop",
+               "#!/bin/bash\n"
+               "sed -i 's/autologin-session=openbox/autologin-session=cinnamon/' "
+               "/etc/lightdm/lightdm.conf.d/50-cablebox.conf\n"
+               "systemctl restart lightdm\n")
+    sudo("chmod +x /usr/local/bin/cablebox-desktop")
+    ok("Created /usr/local/bin/cablebox-desktop")
+
+    # Script to switch back to kiosk from desktop
+    sudo_write("/usr/local/bin/cablebox-kiosk",
+               "#!/bin/bash\n"
+               "sed -i 's/autologin-session=cinnamon/autologin-session=openbox/' "
+               "/etc/lightdm/lightdm.conf.d/50-cablebox.conf\n"
+               "reboot\n")
+    sudo("chmod +x /usr/local/bin/cablebox-kiosk")
+    ok("Created /usr/local/bin/cablebox-kiosk")
+
+    # Allow running both scripts without a password prompt
+    sudoers = (f"{USER} ALL=(ALL) NOPASSWD: /usr/local/bin/cablebox-desktop\n"
+               f"{USER} ALL=(ALL) NOPASSWD: /usr/local/bin/cablebox-kiosk\n")
+    sudo_write("/etc/sudoers.d/cablebox", sudoers)
+    sudo("chmod 440 /etc/sudoers.d/cablebox")
+    ok("Sudoers configured (no password needed for switch scripts)")
 
 
 def s10_optimise():
