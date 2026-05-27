@@ -185,22 +185,22 @@ def s5_media():
     header(5, "Mount media drive")
     info("Current block devices:")
     run("lsblk")
+    drive_mounted = False
     if not ask("Set up media drive auto-mount now?"):
-        warn("Skipping — edit standalone-compose.yml later if your media isn't at /media")
-        mount = "/media"
+        mount = str(HOME / 'media')
     else:
         device = prompt("Device path (e.g. /dev/sdb1)")
         if not device:
-            warn("Skipping mount")
-            mount = "/media"
+            mount = str(HOME / 'media')
         else:
             mount = prompt("Mount point", default="/media")
             sudo(f"mkdir -p {mount}")
             r = sudo(f"mount {device} {mount}", check=False)
             if r.returncode != 0:
-                warn("Mount failed — check the device name and retry manually")
-                mount = "/media"
+                warn("Mount failed — falling back to home directory")
+                mount = str(HOME / 'media')
             else:
+                drive_mounted = True
                 r = run(f"sudo blkid -s UUID -o value {device}", capture=True, check=False)
                 uuid = r.stdout.strip()
                 if uuid:
@@ -215,11 +215,15 @@ def s5_media():
 
     for folder in ['Movies', 'Shows', 'Videos']:
         path = Path(mount) / folder
-        if not path.exists():
-            sudo(f"mkdir -p {path}")
-            ok(f"Created {path}")
-        else:
-            ok(f"{path} already exists")
+        path.mkdir(parents=True, exist_ok=True)
+        ok(f"{'Created' if not path.exists() else 'Using'} {path}")
+
+    # Update compose file to point to the actual media location
+    compose = Path(COMP)
+    compose_text = compose.read_text()
+    compose_text = re.sub(r'- .+:/media:ro', f'- {mount}:/media:ro', compose_text)
+    compose.write_text(compose_text)
+    ok(f"Compose media path set to {mount}")
 
 
 def _wait_for(url, label, timeout=60):

@@ -51,7 +51,7 @@ When the script pauses, open **http://localhost:8096** in a browser.
 2. Create an admin account — remember this password
 3. Add your media libraries — for each one:
    - Content type: **TV Shows**, **Movies**, or **Videos**
-   - Folder: `/media/Shows`, `/media/Movies`, or `/media/Videos`
+   - Folder: `/media/Shows`, `/media/Movies`, or `/media/Videos` (or `~/media/Shows` etc. if no external drive was mounted)
    - Click the green checkmark, then **OK**
 4. Click through the remaining wizard steps and **Finish**
 5. Log in with the account you just created
