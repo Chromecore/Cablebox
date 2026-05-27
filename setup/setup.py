@@ -353,15 +353,22 @@ def s9_openbox():
     # Script to switch to Cinnamon desktop from kiosk
     sudo_write("/usr/local/bin/cablebox-desktop",
                "#!/bin/bash\n"
+               "touch /run/cablebox-switching\n"
                "sed -i 's/autologin-session=openbox/autologin-session=cinnamon/' "
                "/etc/lightdm/lightdm.conf.d/50-cablebox.conf\n"
                "systemctl restart lightdm\n")
     sudo("chmod +x /usr/local/bin/cablebox-desktop")
     ok("Created /usr/local/bin/cablebox-desktop")
 
-    # Cleanup script — LightDM runs this after every session ends, restoring openbox
+    # Cleanup script — LightDM runs this after every session ends.
+    # The flag file tells it whether the session ended because we're switching to desktop
+    # (skip restore) or because the user logged out of Cinnamon (restore openbox).
     sudo_write("/usr/local/bin/cablebox-session-cleanup",
                "#!/bin/bash\n"
+               "if [ -f /run/cablebox-switching ]; then\n"
+               "    rm /run/cablebox-switching\n"
+               "    exit 0\n"
+               "fi\n"
                "sed -i 's/autologin-session=cinnamon/autologin-session=openbox/' "
                "/etc/lightdm/lightdm.conf.d/50-cablebox.conf\n")
     sudo("chmod +x /usr/local/bin/cablebox-session-cleanup")
