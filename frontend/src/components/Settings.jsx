@@ -27,6 +27,9 @@ export default function Settings({ onSaved, firstRun = false }) {
   })
   const [bindings, setBindings] = useState({})
   const [capturing, setCapturing] = useState(null)
+  const [standalone, setStandalone] = useState(false)
+  const [updating, setUpdating] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState('')
 
   useEffect(() => {
     if (firstRun) return
@@ -39,6 +42,7 @@ export default function Settings({ onSaved, firstRun = false }) {
           jellyfinPublicUrl: d.jellyfinPublicUrl || '',
           jellyfinUserId: d.jellyfinUserId || '',
         }))
+        setStandalone(d.standalone || false)
       })
     fetch('/api/keybindings')
       .then(r => r.json())
@@ -99,6 +103,27 @@ export default function Settings({ onSaved, firstRun = false }) {
       setStatus('✗ ' + text)
     }
     setTesting(false)
+  }
+
+  const triggerUpdate = async () => {
+    setUpdating(true)
+    setUpdateStatus('')
+    try {
+      await fetch('/api/update', { method: 'POST' })
+      setUpdateStatus('Update started — the app will restart in a moment.')
+      setTimeout(() => {
+        const poll = setInterval(async () => {
+          try {
+            await fetch('/api/health')
+            clearInterval(poll)
+            window.location.reload()
+          } catch {}
+        }, 2000)
+      }, 5000)
+    } catch {
+      setUpdateStatus('Failed to start update.')
+      setUpdating(false)
+    }
   }
 
   const clearSchedule = async () => {
@@ -394,6 +419,34 @@ export default function Settings({ onSaved, firstRun = false }) {
               <p className="text-white/30 text-xs text-center">
                 Press any key to assign · <span className="font-mono">Esc</span> to cancel
               </p>
+            )}
+          </div>
+        )}
+
+        {/* Update — only shown on standalone installs */}
+        {standalone && !firstRun && (
+          <div className="rounded-lg p-5 mb-4 flex flex-col gap-3"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <h3 className="font-semibold text-white/60 flex items-center gap-2 text-sm">
+              <span className="material-symbols-outlined text-base">system_update</span>
+              Update CableBox
+            </h3>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-white/70 text-sm font-semibold">Pull latest version</div>
+                <div className="text-white/35 text-xs">Pulls from GitHub and restarts the app.</div>
+              </div>
+              <button
+                onClick={triggerUpdate}
+                disabled={updating}
+                className="flex-shrink-0 px-3 py-1.5 rounded text-xs font-semibold text-white transition-colors"
+                style={{ background: 'rgba(var(--accent-rgb),0.2)', border: '1px solid rgba(var(--accent-rgb),0.4)', opacity: updating ? 0.5 : 1 }}
+              >
+                {updating ? 'Updating…' : 'Update Now'}
+              </button>
+            </div>
+            {updateStatus && (
+              <div className="text-white/50 text-xs font-mono">{updateStatus}</div>
             )}
           </div>
         )}

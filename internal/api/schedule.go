@@ -10,6 +10,8 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1284,7 +1286,22 @@ func (h *Handler) GetAppConfig(w http.ResponseWriter, r *http.Request) {
 		"jellyfinPublicUrl":  jfPublicURL,
 		"accentHex":          accentHex,
 		"accentRgb":          accentRgb,
+		"standalone":         os.Getenv("STANDALONE") == "true",
 	})
+}
+
+// TriggerUpdate writes a flag file that the host systemd path unit detects to run the update script.
+func (h *Handler) TriggerUpdate(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("STANDALONE") != "true" {
+		writeError(w, "not available", http.StatusForbidden)
+		return
+	}
+	flag := filepath.Join(h.DataDir, ".update_requested")
+	if err := os.WriteFile(flag, []byte("1"), 0644); err != nil {
+		writeError(w, "failed to trigger update", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "update_started"})
 }
 
 // UpdateAppConfig saves Jellyfin connection settings and global appearance.

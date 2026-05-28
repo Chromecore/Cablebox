@@ -25,3 +25,4 @@ services:
       - FRONTEND_DIR=/app/frontend/dist
       - JELLYFIN_URL=http://localhost:8096
       - JELLYFIN_PUBLIC_URL=http://localhost:8096
+      - STANDALONE=true

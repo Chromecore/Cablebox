@@ -379,6 +379,36 @@ def s9_openbox():
                "[SeatDefaults]\nsession-cleanup-script=/usr/local/bin/cablebox-session-cleanup\n")
     ok("LightDM session cleanup registered")
 
+    # Update script — triggered by the systemd path unit watching the flag file
+    update_script = (
+        "#!/bin/bash\n"
+        f"cd {HOME}/cablebox\n"
+        "git pull\n"
+        f"docker build -t cablebox:latest {HOME}/cablebox\n"
+        f"env HOME={HOME} docker compose -f {HOME}/cablebox/setup/standalone-compose.yml up -d --force-recreate cablebox\n"
+    )
+    sudo_write("/usr/local/bin/cablebox-update", update_script)
+    sudo("chmod +x /usr/local/bin/cablebox-update")
+    ok("Created /usr/local/bin/cablebox-update")
+
+    sudo_write("/etc/systemd/system/cablebox-update.service",
+               "[Unit]\nDescription=CableBox Update\n\n"
+               "[Service]\nType=oneshot\n"
+               f"User={USER}\n"
+               f"ExecStartPre=/bin/rm -f {HOME}/cablebox/data/.update_requested\n"
+               "ExecStart=/usr/local/bin/cablebox-update\n")
+
+    sudo_write("/etc/systemd/system/cablebox-update.path",
+               "[Unit]\nDescription=CableBox Update Trigger\n\n"
+               "[Path]\n"
+               f"PathExists={HOME}/cablebox/data/.update_requested\n"
+               "Unit=cablebox-update.service\n\n"
+               "[Install]\nWantedBy=multi-user.target\n")
+
+    sudo("systemctl daemon-reload")
+    sudo("systemctl enable --now cablebox-update.path")
+    ok("Update watcher enabled (systemd path unit)")
+
     # Allow running the desktop switch script without a password prompt
     sudoers = f"{USER} ALL=(ALL) NOPASSWD: /usr/local/bin/cablebox-desktop\n"
     sudo_write("/etc/sudoers.d/cablebox", sudoers)
