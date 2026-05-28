@@ -3,4 +3,6 @@ frontend/dist/
 frontend/node_modules/
 __pycache__/
 *.env
+.env
+setup/.env
 docker-compose.yml

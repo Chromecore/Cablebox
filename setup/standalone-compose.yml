@@ -7,7 +7,7 @@ services:
     volumes:
       - ${HOME}/jellyfin/config:/config
       - ${HOME}/jellyfin/cache:/cache
-      - /media:/media:ro        # Edit this line: change /media to your media drive path
+      - ${MEDIA_PATH:-/media}:/media:ro
     environment:
       - JELLYFIN_PublishedServerUrl=http://localhost:8096
 

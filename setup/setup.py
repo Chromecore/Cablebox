@@ -218,12 +218,10 @@ def s5_media():
         path.mkdir(parents=True, exist_ok=True)
         ok(f"{'Created' if not path.exists() else 'Using'} {path}")
 
-    # Update compose file to point to the actual media location
-    compose = Path(COMP)
-    compose_text = compose.read_text()
-    compose_text = re.sub(r'- .+:/media:ro', f'- {mount}:/media:ro', compose_text)
-    compose.write_text(compose_text)
-    ok(f"Compose media path set to {mount}")
+    # Write media path to .env file next to the compose file (gitignored, never overwritten by git pull)
+    env_file = CBOX / 'setup/.env'
+    env_file.write_text(f"MEDIA_PATH={mount}\n")
+    ok(f"Media path saved to {env_file} ({mount})")
 
 
 def _wait_for(url, label, timeout=60):
