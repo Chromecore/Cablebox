@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 
 const DISMISS_MS = 4000
 
-export default function TouchMenu({ onChannelUp, onChannelDown, onGuide, onAdmin, onJellyfin, hasJellyfin, onClose }) {
+export default function TouchMenu({ onChannelUp, onChannelDown, onGuide, onAdmin, onJellyfin, hasJellyfin, standalone, onClose }) {
   const barRef = useRef(null)
   const onCloseRef = useRef(onClose)
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
@@ -26,6 +26,8 @@ export default function TouchMenu({ onChannelUp, onChannelDown, onGuide, onAdmin
     { icon: 'admin_panel_settings', label: 'Admin',         action: onAdmin },
     ...(hasJellyfin ? [{ icon: 'stream', label: 'Open Jellyfin', action: onJellyfin }] : []),
   ]
+
+  const shutdown = () => fetch('/api/shutdown', { method: 'POST' }).catch(() => {})
 
   return (
     <div
@@ -52,6 +54,17 @@ export default function TouchMenu({ onChannelUp, onChannelDown, onGuide, onAdmin
             <span className="font-display font-semibold text-base">{label}</span>
           </button>
         ))}
+
+        {standalone && (
+          <button
+            onPointerDown={e => { e.stopPropagation(); shutdown(); onClose() }}
+            className="flex items-center gap-4 w-full px-6 py-4 text-left border-t border-white/5 active:bg-white/5"
+            style={{ color: 'rgba(239,68,68,0.8)' }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 26 }}>power_settings_new</span>
+            <span className="font-display font-semibold text-base">Shut Down</span>
+          </button>
+        )}
 
         {/* Auto-dismiss progress bar */}
         <div className="h-0.5 bg-white/5">

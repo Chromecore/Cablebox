@@ -1290,6 +1290,20 @@ func (h *Handler) GetAppConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// TriggerShutdown runs systemctl poweroff on the host (standalone only).
+func (h *Handler) TriggerShutdown(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("STANDALONE") != "true" {
+		writeError(w, "not available", http.StatusForbidden)
+		return
+	}
+	flag := filepath.Join(h.DataDir, ".shutdown_requested")
+	if err := os.WriteFile(flag, []byte("1"), 0644); err != nil {
+		writeError(w, "failed to trigger shutdown", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "shutdown_started"})
+}
+
 // TriggerUpdate writes a flag file that the host systemd path unit detects to run the update script.
 func (h *Handler) TriggerUpdate(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("STANDALONE") != "true" {

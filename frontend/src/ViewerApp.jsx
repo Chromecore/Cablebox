@@ -144,6 +144,7 @@ export default function ViewerApp({ onOpenPIN }) {
   const [showStreamingPrompt, setShowStreamingPrompt] = useState(false)
   const [showTouchMenu, setShowTouchMenu] = useState(false)
   const [jellyfinPublicUrl, setJellyfinPublicUrl] = useState('')
+  const [standalone, setStandalone] = useState(false)
 
   const overlayTimerRef = useRef(null)
   const pendingTimerRef = useRef(null)
@@ -166,6 +167,7 @@ export default function ViewerApp({ onOpenPIN }) {
   useEffect(() => {
     fetch('/api/config').then(r => r.json()).then(cfg => {
       if (cfg.jellyfinPublicUrl) setJellyfinPublicUrl(cfg.jellyfinPublicUrl)
+      if (cfg.standalone) setStandalone(true)
     }).catch(() => {})
   }, [])
 
@@ -456,6 +458,7 @@ export default function ViewerApp({ onOpenPIN }) {
           onAdmin={() => onOpenPIN?.()}
           onJellyfin={() => setShowStreamingPrompt(true)}
           hasJellyfin={!!jellyfinPublicUrl}
+          standalone={standalone}
           onClose={() => setShowTouchMenu(false)}
         />
       )}

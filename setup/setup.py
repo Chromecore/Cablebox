@@ -405,9 +405,22 @@ def s9_openbox():
                "Unit=cablebox-update.service\n\n"
                "[Install]\nWantedBy=multi-user.target\n")
 
+    sudo_write("/etc/systemd/system/cablebox-shutdown.service",
+               "[Unit]\nDescription=CableBox Shutdown\n\n"
+               "[Service]\nType=oneshot\n"
+               f"ExecStartPre=/bin/rm -f {HOME}/cablebox/data/.shutdown_requested\n"
+               "ExecStart=/sbin/poweroff\n")
+
+    sudo_write("/etc/systemd/system/cablebox-shutdown.path",
+               "[Unit]\nDescription=CableBox Shutdown Trigger\n\n"
+               "[Path]\n"
+               f"PathExists={HOME}/cablebox/data/.shutdown_requested\n"
+               "Unit=cablebox-shutdown.service\n\n"
+               "[Install]\nWantedBy=multi-user.target\n")
+
     sudo("systemctl daemon-reload")
-    sudo("systemctl enable --now cablebox-update.path")
-    ok("Update watcher enabled (systemd path unit)")
+    sudo("systemctl enable --now cablebox-update.path cablebox-shutdown.path")
+    ok("Update and shutdown watchers enabled (systemd path units)")
 
     # Allow running the desktop switch script without a password prompt
     sudoers = f"{USER} ALL=(ALL) NOPASSWD: /usr/local/bin/cablebox-desktop\n"

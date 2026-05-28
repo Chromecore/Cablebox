@@ -81,6 +81,7 @@ func NewRouter(h *Handler, frontendDir string, dataDir string) http.Handler {
 		r.Get("/config", h.GetAppConfig)
 		r.Post("/config", h.UpdateAppConfig)
 		r.Post("/update", h.TriggerUpdate)
+		r.Post("/shutdown", h.TriggerShutdown)
 
 		// Per-device key bindings (device identified by cb-device-id cookie)
 		r.Get("/keybindings", h.GetKeybindings)
