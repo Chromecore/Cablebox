@@ -174,7 +174,7 @@ def s3_docker():
 def s4_build():
     header(4, "Build Docker image")
     if ok_run('sudo docker image inspect cablebox:latest') \
-            and not ask("Image cablebox:latest already exists. Rebuild?", default='n'):
+            and not ask("Image cablebox:latest already exists. Rebuild?", default='y'):
         ok("Using existing image"); return
     info("Building image (2–5 minutes on first run)...")
     run(f"sudo docker build -t cablebox:latest {CBOX}")
@@ -263,7 +263,7 @@ def s6_jellyfin():
 def s7_cablebox():
     header(7, "Start and configure CableBox")
     (CBOX / 'data').mkdir(parents=True, exist_ok=True)
-    sudo(f"env HOME={HOME} docker compose -f {COMP} up -d cablebox")
+    sudo(f"env HOME={HOME} docker compose -f {COMP} up -d --force-recreate cablebox")
 
     ready = _wait_for("http://localhost:8080/api/health", "CableBox", timeout=60)
     if ready:
