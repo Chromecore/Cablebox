@@ -147,20 +147,32 @@ export default function Scheduler({ draggedItem, onDragEnd }) {
       if (snappedMin !== 0) justDragged.current = true
 
       if (d.mode === 'resize') {
+        const dayStartMs = selectedDay.getTime()
+        const dayEndMs   = dayStartMs + 24 * 60 * 60_000
+
         // Update ref directly so onUp always reads final positions regardless of React re-render timing
         scheduleRef.current = scheduleRef.current.map(b => {
           if (b.id !== d.blockId) return b
           if (d.edge === 'right') {
-            return { ...b, durationSeconds: Math.max(SNAP_DRAG * 60, d.origDurSecs + snappedMin * 60) }
+            const rawDur = Math.max(SNAP_DRAG * 60, d.origDurSecs + snappedMin * 60)
+            // Clamp so the block doesn't extend past the end of the day
+            const maxDur = Math.floor((dayEndMs - d.origStartMs) / 1000)
+            return { ...b, durationSeconds: Math.min(rawDur, maxDur) }
           } else {
             const newDurSecs = Math.max(SNAP_DRAG * 60, d.origDurSecs - snappedMin * 60)
-            const newStartIso = new Date(d.origStartMs + snappedMin * 60_000).toISOString()
-            return { ...b, startTime: newStartIso, computedStart: newStartIso, durationSeconds: newDurSecs }
+            const newStartMs = Math.max(dayStartMs, d.origStartMs + snappedMin * 60_000)
+            // Clamp so the block doesn't go before the start of the day
+            const clampedDur = d.origStartMs + d.origDurSecs * 1000 - newStartMs
+            const newStartIso = new Date(newStartMs).toISOString()
+            return { ...b, startTime: newStartIso, computedStart: newStartIso, durationSeconds: Math.max(SNAP_DRAG * 60, Math.floor(clampedDur / 1000)) }
           }
         })
         setSchedule(scheduleRef.current)
       } else if (d.mode === 'move') {
-        const newStartIso = new Date(d.origStartMs + snappedMin * 60_000).toISOString()
+        const dayStartMs = selectedDay.getTime()
+        const dayEndMs   = dayStartMs + 24 * 60 * 60_000
+        const clampedStartMs = Math.max(dayStartMs, Math.min(dayEndMs - d.origDurSecs * 1000, d.origStartMs + snappedMin * 60_000))
+        const newStartIso = new Date(clampedStartMs).toISOString()
         let targetChannelId = d.origChannelId
         if (scrollRef.current && channelsRef.current.length > 0) {
           const rect = scrollRef.current.getBoundingClientRect()
@@ -312,6 +324,7 @@ export default function Scheduler({ draggedItem, onDragEnd }) {
       const nowMs = Date.now()
       const moveConflicts = scheduleRef.current.filter(b => {
         if (b.channelId !== block.channelId || b.id === block.id) return false
+        if (block.groupId && b.groupId === block.groupId) return false
         const bS = new Date(b.computedStart || b.startTime).getTime()
         const bE = bS + b.durationSeconds * 1000
         if (bE <= nowMs) return false // already ended — not a conflict
@@ -441,6 +454,7 @@ export default function Scheduler({ draggedItem, onDragEnd }) {
         const bS = new Date(b.computedStart || b.startTime).getTime()
         const bE = bS + b.durationSeconds * 1000
         if (aE <= now && bE <= now) continue // both already ended — ignore
+        if (a.groupId && a.groupId === b.groupId) continue
         if (aS < bE && aE > bS) { ids.add(a.id); ids.add(b.id) }
       }
     }
@@ -448,11 +462,12 @@ export default function Scheduler({ draggedItem, onDragEnd }) {
   }, [schedule])
 
   // Returns blocks on channelId that overlap [startMs, startMs+durationSecs*1000), optionally excluding one block
-  const getOverlaps = (channelId, startMs, durationSecs, excludeId = null) => {
+  const getOverlaps = (channelId, startMs, durationSecs, excludeId = null, excludeGroupId = null) => {
     const endMs = startMs + durationSecs * 1000
     return scheduleRef.current.filter(b => {
       if (b.channelId !== channelId) return false
       if (excludeId !== null && b.id === excludeId) return false
+      if (excludeGroupId && b.groupId === excludeGroupId) return false
       const bS = new Date(b.computedStart || b.startTime).getTime()
       return startMs < bS + b.durationSeconds * 1000 && endMs > bS
     })
@@ -1412,8 +1427,10 @@ function BlockEditModal({ block, onClose, onDelete, onDeleteIndividual, onDelete
           const instEnd = instStart + block.durationSeconds * 1000
           const hits = blocks.filter(b => {
             if (b.id === block.id) return false
+            if (block.groupId && b.groupId === block.groupId) return false
             const bS = new Date(b.computedStart).getTime()
-            return instStart < bS + b.durationSeconds * 1000 && instEnd > bS
+            const bE = bS + b.durationSeconds * 1000
+            return instStart < bE && instEnd > bS
           })
           if (hits.length > 0) {
             conflicts.push({ date: new Date(instStart), names: hits.map(b => b.showName || 'a block') })

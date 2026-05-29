@@ -8,6 +8,7 @@ import (
 	"hash/fnv"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -1272,6 +1273,72 @@ func (h *Handler) VerifyPIN(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
+// localURL returns an IP-based URL for the server so AirPlay-capable devices (e.g. Apple TV)
+// can reach it without needing Pi-hole DNS to resolve *.internal hostnames.
+func localURL() string {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, _ := iface.Addrs()
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() || ip.To4() == nil {
+				continue
+			}
+			return "http://" + ip.String() + ":" + port
+		}
+	}
+	return ""
+}
+
+// GetAirPlayURL returns a direct Jellyfin HTTP stream URL for AirPlay.
+// This mirrors what Infuse does — Apple TV fetches directly from Jellyfin on the
+// local network using HTTP (port 8096), bypassing Traefik and any TLS cert issues.
+func (h *Handler) GetAirPlayURL(w http.ResponseWriter, r *http.Request) {
+	itemID := r.URL.Query().Get("itemId")
+	if itemID == "" {
+		writeError(w, "missing itemId", http.StatusBadRequest)
+		return
+	}
+	jfKey, _ := h.DB.GetConfig("jellyfin_api_key")
+
+	// Build a Jellyfin URL using the host's LAN IP on port 8096 so Apple TV can
+	// reach Jellyfin directly without needing to resolve *.internal hostnames or
+	// trust the custom CA cert.
+	jellyfinLocal := ""
+	if cb := localURL(); cb != "" {
+		if u, err := url.Parse(cb); err == nil {
+			host := strings.Split(u.Hostname(), ":")[0]
+			u.Host = host + ":8096"
+			u.Path = ""
+			jellyfinLocal = u.String()
+		}
+	}
+	if jellyfinLocal == "" {
+		jfURL, _ := h.DB.GetConfig("jellyfin_url")
+		jellyfinLocal = jfURL
+	}
+
+	airplayURL := fmt.Sprintf("%s/Videos/%s/stream?Static=true&api_key=%s&MediaSourceId=%s",
+		strings.TrimRight(jellyfinLocal, "/"), itemID, jfKey, itemID)
+	writeJSON(w, map[string]string{"url": airplayURL})
+}
+
 // GetAppConfig returns non-sensitive config values.
 func (h *Handler) GetAppConfig(w http.ResponseWriter, r *http.Request) {
 	jfURL, _ := h.DB.GetConfig("jellyfin_url")
@@ -1287,6 +1354,7 @@ func (h *Handler) GetAppConfig(w http.ResponseWriter, r *http.Request) {
 		"accentHex":          accentHex,
 		"accentRgb":          accentRgb,
 		"standalone":         os.Getenv("STANDALONE") == "true",
+		"localUrl":           localURL(),
 	})
 }
 

@@ -1,15 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
 
-// Computed once at module load — false on iOS WebKit (no MSE), true on Chrome/Firefox.
-const USE_HLS   = Hls.isSupported()
-
 // Mobile browsers can't decode common audio codecs (AC3/DTS/EAC3) in direct video files.
 // Detect mobile once so we skip the doomed direct-file attempt and go straight to HLS.
 const IS_IOS    = /iPhone|iPad|iPod/i.test(navigator.userAgent)
 const IS_MOBILE = IS_IOS || /Android/i.test(navigator.userAgent)
 
-export default function VideoPlayer({ streamUrl, blockId, type, emptyImageUrl, seekPosition = 0, onEnded, hideStatic = false }) {
+// Use HLS.js on desktop browsers that support MSE. On iOS, always use native HLS so
+// AirPlay gets a real URL (not a blob) and can send both audio AND video to the TV.
+const USE_HLS   = Hls.isSupported() && !IS_IOS
+
+// Rebase a stream URL to use an IP-based origin so AirPlay destinations (Apple TV) can
+// fetch it directly without needing Pi-hole DNS to resolve *.internal hostnames.
+// Skip rebasing in HTTPS contexts — downgrading to HTTP would be blocked as mixed content.
+function rebaseUrl(url, localUrl) {
+  if (!url || !localUrl || !IS_IOS) return url
+  if (window.location.protocol === 'https:') return url
+  if (url.startsWith('/')) return localUrl + url
+  try {
+    const u = new URL(url)
+    const l = new URL(localUrl)
+    u.protocol = l.protocol
+    u.hostname = l.hostname
+    u.port = l.port
+    return u.toString()
+  } catch { return url }
+}
+
+export default function VideoPlayer({ streamUrl, blockId, type, emptyImageUrl, seekPosition = 0, onEnded, hideStatic = false, localUrl = '' }) {
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
   const [error, setError] = useState(null)
@@ -17,60 +35,39 @@ export default function VideoPlayer({ streamUrl, blockId, type, emptyImageUrl, s
   const [playBlocked, setPlayBlocked] = useState(false)
   const [mutedAutoplay, setMutedAutoplay] = useState(false)
   const [airplayAvailable, setAirplayAvailable] = useState(false)
-  const [airplayActive, setAirplayActive] = useState(false)
+
+  const localUrlRef = useRef(localUrl)
+  useEffect(() => { localUrlRef.current = localUrl }, [localUrl])
 
   // streamUrl is stable per episode (no startTicks in URL), only changes on block/episode switch.
-  const streamUrlRef = useRef(streamUrl)
-  useEffect(() => { streamUrlRef.current = streamUrl }, [streamUrl])
+  const streamUrlRef = useRef(rebaseUrl(streamUrl, localUrl))
+  useEffect(() => { streamUrlRef.current = rebaseUrl(streamUrl, localUrlRef.current) }, [streamUrl])
+
+  // Pre-fetched direct Jellyfin URL for AirPlay (like Infuse: HTTP to port 8096, no TLS).
+  const airplayUrlRef = useRef('')
+  const airplaySwitchingRef = useRef(false)
+  useEffect(() => {
+    airplayUrlRef.current = ''
+    if (!streamUrl?.includes('stream-file')) return
+    const itemId = new URLSearchParams(streamUrl.split('?')[1] || '').get('itemId')
+    if (!itemId) return
+    fetch(`/api/airplay-url?itemId=${itemId}`)
+      .then(r => r.json())
+      .then(d => { if (d.url) airplayUrlRef.current = d.url })
+      .catch(() => {})
+  }, [streamUrl])
 
   // seekPosition is the live episode offset in seconds — set once when the block loads.
   const seekPositionRef = useRef(seekPosition)
   useEffect(() => { seekPositionRef.current = seekPosition }, [seekPosition])
 
-  // AirPlay availability — iOS WebKit only
+  // AirPlay availability — iOS WebKit only.
   useEffect(() => {
     const video = videoRef.current
     if (!video || !('WebKitPlaybackTargetAvailabilityEvent' in window)) return
-
     const onAvailability = (e) => setAirplayAvailable(e.availability === 'available')
-
-    const onPresentationChange = () => {
-      const isWireless = video.webkitCurrentPlaybackTargetIsWireless ?? false
-      setAirplayActive(isWireless)
-      if (isWireless) {
-        // HLS.js attaches via a MediaSource blob URL. Apple TV can't fetch video from a
-        // blob — only audio relays, so the TV gets audio-only. Switch to native HLS
-        // (real URL) only while AirPlay is active so Apple TV can fetch the stream
-        // directly. Local playback keeps HLS.js for better buffering / quality control.
-        video.removeAttribute('playsinline')
-        video.removeAttribute('webkit-playsinline')
-        if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
-        // Advance startTicks by elapsed time so Apple TV joins at the current position.
-        let url = streamUrlRef.current || ''
-        const elapsed = Math.round((video.currentTime || 0) * 10_000_000)
-        url = url.replace(/startTicks=(\d+)/, (_, t) => `startTicks=${parseInt(t, 10) + elapsed}`)
-        video.src = url
-        video.load()
-        video.addEventListener('canplay', () => video.play().catch(() => {}), { once: true })
-      } else {
-        video.setAttribute('playsinline', '')
-        // Back on device — restore HLS.js for local playback.
-        if (streamUrlRef.current) {
-          const hls = new Hls({ startFragPrefetch: true, maxBufferLength: 10, maxMaxBufferLength: 30 })
-          hlsRef.current = hls
-          hls.attachMedia(video)
-          hls.loadSource(streamUrlRef.current)
-          video.addEventListener('canplay', () => video.play().catch(() => {}), { once: true })
-        }
-      }
-    }
-
     video.addEventListener('webkitplaybacktargetavailabilitychanged', onAvailability)
-    video.addEventListener('webkitcurrentplaybacktargetiswirelesschanged', onPresentationChange)
-    return () => {
-      video.removeEventListener('webkitplaybacktargetavailabilitychanged', onAvailability)
-      video.removeEventListener('webkitcurrentplaybacktargetiswirelesschanged', onPresentationChange)
-    }
+    return () => video.removeEventListener('webkitplaybacktargetavailabilitychanged', onAvailability)
   }, [])
 
   // Keep playing when the iOS screen locks.
@@ -119,14 +116,15 @@ export default function VideoPlayer({ streamUrl, blockId, type, emptyImageUrl, s
   function initStream(video, url, onHlsError) {
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
 
-    let effectiveUrl = url
-    // Mobile browsers can't decode AC3/DTS/EAC3 — skip the doomed direct-file
-    // attempt entirely and go straight to HLS transcoding (outputs AAC).
+    let effectiveUrl = rebaseUrl(url, localUrlRef.current)
+    // Mobile browsers can't decode AC3/DTS/EAC3 in direct files — go straight to HLS
+    // transcoding (outputs AAC). For AirPlay, the button handler switches to direct file
+    // right before calling webkitShowPlaybackTargetPicker so Apple TV gets it.
     if (IS_MOBILE && url.includes('stream-file')) {
       const itemId = new URLSearchParams(url.split('?')[1] || '').get('itemId')
       if (itemId) {
         const startTicks = Math.round(seekPositionRef.current * 10_000_000)
-        effectiveUrl = `/api/stream-proxy?itemId=${itemId}&startTicks=${startTicks}`
+        effectiveUrl = rebaseUrl(`/api/stream-proxy?itemId=${itemId}&startTicks=${startTicks}`, localUrlRef.current)
         streamUrlRef.current = effectiveUrl
       }
     }
@@ -241,6 +239,7 @@ export default function VideoPlayer({ streamUrl, blockId, type, emptyImageUrl, s
     }
     const onCanPlay = () => { setLoading(false); setError(null) }
     const onError = () => {
+      if (airplaySwitchingRef.current) return  // ignore mixed-content error during AirPlay switch
       const errCode = video.error?.code ?? -1
       if (firstErrorCode === -1) firstErrorCode = errCode
       // Format not supported → immediately try HLS (avoids multiple retries of an unplayable file)
@@ -313,20 +312,35 @@ export default function VideoPlayer({ streamUrl, blockId, type, emptyImageUrl, s
 
       {airplayAvailable && (
         <button
-          onClick={() => videoRef.current?.webkitShowPlaybackTargetPicker()}
+          onClick={() => {
+            const video = videoRef.current
+            const apUrl = airplayUrlRef.current
+            if (video && apUrl) {
+              // Use the pre-fetched direct Jellyfin URL (http://server-ip:8096/...).
+              // This is exactly what Infuse does — Apple TV fetches directly from Jellyfin
+              // via HTTP on port 8096, bypassing Traefik and the custom TLS cert entirely.
+              // video.load() updates currentSrc synchronously before the mixed-content error
+              // fires. airplaySwitchingRef suppresses the fallback so we don't switch to HLS.
+              airplaySwitchingRef.current = true
+              video.src = apUrl
+              video.load()
+              setTimeout(() => { airplaySwitchingRef.current = false }, 5000)
+            }
+            videoRef.current?.webkitShowPlaybackTargetPicker()
+          }}
           className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-2 rounded-full transition-all"
           style={{
-            background: airplayActive ? 'rgba(var(--accent-rgb),0.85)' : 'rgba(0,0,0,0.55)',
-            border: airplayActive ? '1px solid rgba(var(--accent-rgb),0.9)' : '1px solid rgba(255,255,255,0.15)',
+            background: 'rgba(0,0,0,0.55)',
+            border: '1px solid rgba(255,255,255,0.15)',
             backdropFilter: 'blur(8px)',
           }}
         >
-          <AirPlayIcon active={airplayActive} />
+          <AirPlayIcon />
           <span
             className="font-mono text-white leading-none"
             style={{ fontSize: 11 }}
           >
-            {airplayActive ? 'AirPlaying' : 'AirPlay'}
+            AirPlay
           </span>
         </button>
       )}
@@ -363,19 +377,19 @@ export default function VideoPlayer({ streamUrl, blockId, type, emptyImageUrl, s
   )
 }
 
-function AirPlayIcon({ active }) {
+function AirPlayIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
       <path
         d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"
-        stroke={active ? 'white' : 'rgba(255,255,255,0.8)'}
+        stroke="rgba(255,255,255,0.8)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <polygon
         points="12 15 17 21 7 21"
-        fill={active ? 'white' : 'rgba(255,255,255,0.8)'}
+        fill="rgba(255,255,255,0.8)"
       />
     </svg>
   )

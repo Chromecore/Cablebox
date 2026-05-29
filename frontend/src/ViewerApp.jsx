@@ -145,6 +145,7 @@ export default function ViewerApp({ onOpenPIN }) {
   const [showTouchMenu, setShowTouchMenu] = useState(false)
   const [jellyfinPublicUrl, setJellyfinPublicUrl] = useState('')
   const [standalone, setStandalone] = useState(false)
+  const [localUrl, setLocalUrl] = useState('')
 
   const overlayTimerRef = useRef(null)
   const pendingTimerRef = useRef(null)
@@ -168,6 +169,7 @@ export default function ViewerApp({ onOpenPIN }) {
     fetch('/api/config').then(r => r.json()).then(cfg => {
       if (cfg.jellyfinPublicUrl) setJellyfinPublicUrl(cfg.jellyfinPublicUrl)
       if (cfg.standalone) setStandalone(true)
+      if (cfg.localUrl) setLocalUrl(cfg.localUrl)
     }).catch(() => {})
   }, [])
 
@@ -387,6 +389,7 @@ export default function ViewerApp({ onOpenPIN }) {
         seekPosition={currentInfo?.positionSeconds ?? 0}
         onEnded={fetchNow}
         hideStatic={!!(currentInfo?.next && !currentInfo?.streamUrl && nextWithin24h)}
+        localUrl={localUrl}
       />
 
       {/* Next up card — shown during a gap before the next scheduled item */}
