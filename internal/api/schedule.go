@@ -1317,18 +1317,10 @@ func (h *Handler) GetAirPlayURL(w http.ResponseWriter, r *http.Request) {
 	}
 	jfKey, _ := h.DB.GetConfig("jellyfin_api_key")
 
-	// Build a Jellyfin URL using the host's LAN IP on port 8096 so Apple TV can
-	// reach Jellyfin directly without needing to resolve *.internal hostnames or
-	// trust the custom CA cert.
-	jellyfinLocal := ""
-	if cb := localURL(); cb != "" {
-		if u, err := url.Parse(cb); err == nil {
-			host := strings.Split(u.Hostname(), ":")[0]
-			u.Host = host + ":8096"
-			u.Path = ""
-			jellyfinLocal = u.String()
-		}
-	}
+	// Use JELLYFIN_LOCAL_URL — the host-accessible HTTP URL for Jellyfin (e.g.
+	// http://192.168.0.90:8096). localURL() runs inside Docker and returns the
+	// container's IP, not the host's LAN IP, so it can't be used here.
+	jellyfinLocal := os.Getenv("JELLYFIN_LOCAL_URL")
 	if jellyfinLocal == "" {
 		jfURL, _ := h.DB.GetConfig("jellyfin_url")
 		jellyfinLocal = jfURL
